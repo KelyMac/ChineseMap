@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
+    <title>Interactive Map</title>
+    <style>
+        #map { 
+            height: 920px;
+        }
+        .info, .layer-control {
+            padding: 8px 10px;
+            font: 14px/16px Arial, Helvetica, sans-serif;
+            background: white;
+            background: rgba(255,255,255,0.8);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+        }
+        .info h4 {
+            margin: 0 0 5px;
+            color: #777;
+        }
+        .legend {
+            line-height: 18px;
+            color: #555;
+        }
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+        .layer-control select {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        // Display provinces data on the map
+        var map = L.map('map').setView([35.6, 106.4], 5);
+        var tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+
+        // Custom control for displaying information
+        var info = L.control();
+        info.onAdd = function (map) {
+            this._div = L.DomUtil.create('div', 'info');
+            this.update();
+            return this._div;
+        };
+
+        // Initialize the content of the info control, including title, features
+        info.update = function (props, activeLayer) {
+            var infoContent = '<h4>Chinese Student Recruitment</h4>';
+            if (props) {
+                infoContent += '<b>' + props.name + '</b><br />';
+                switch (activeLayer) {
+                    case 'Applications':
+                        infoContent += props.application + ' Applications';
+                        break;
+                    case 'Admit':
+                        infoContent += props.admit + ' Admit';
+                        break;
+                    case 'Enroll':
+                        infoContent += props.enroll + ' Enroll';
+                        break;
+                    case 'Schools':
+                        infoContent += props.schoolSum + ' Schools';
+                        break;
+                }
+            } else {
+                infoContent += 'Hover over a province';
+            }
+            // Insert the content into the of the control
+            this._div.innerHTML = infoContent;
+        };
+        info.addTo(map);
+
+        // Set up color
+        function getColor(d) {
+            return d > 2000 ? '#800026' :
+                   d > 1000 ? '#BD0026' :
+                   d > 500  ? '#E31A1C' :
+                   d > 200  ? '#FC4E2A' :
+                   d > 100  ? '#FD8D3C' :
+                   d > 50   ? '#FEB24C' :
+                   d > 10   ? '#FED976' :
+                              '#FFEDA0';
+        }
+
+        function getColorSchool(d) {
+            return d > 200 ? '#4a1486' :
+                   d > 100 ? '#6a51a3' :
+                   d > 80  ? '#807dba' :
+                   d > 60  ? '#9e9ac8' :
+                   d > 40  ? '#bcbddc' :
+                   d > 20   ? '#dadaeb' :
+                   d > 4   ? '#efedf5' : 
+                              '#fcfbfd'; 
+        }
+
+        // Adding borders with dashed stroke
+        function styleApplications(feature) {
+            return {
+                fillColor: getColor(feature.properties.application),
+                weight: 2,
+                opacity: 1,
+                color: 'white',
+                dashArray: '3',
+                fillOpacity: 0.7
+            };
+        }
+
+        function styleAdmit(feature) {
+            return {
+                fillColor: getColor(feature.properties.admit),
+                weight: 2,
+                opacity: 1,
+                color: 'white',
+                dashArray: '3',
+                fillOpacity: 0.7
+            };
+        }
+
+        function styleEnroll(feature) {
+            return {
+                fillColor: getColor(feature.properties.enroll),
+                weight: 2,
+                opacity: 1,
+                color: 'white',
+                dashArray: '3',
+                fillOpacity: 0.7
+            };
+        }
+
+        function styleSchools(feature) {
+            return {
+                fillColor: getColorSchool(feature.properties.schoolSum),
+                weight: 2,
+                opacity: 1,
+                color: 'white',
+                dashArray: '3',
+                fillOpacity: 0.7
+            };
+        }
+
+        // Modified highlightFeature and resetHighlight functions
+        function highlightFeature(e) {
+            var layer = e.target;
+            var highlightStyle;
+
+            if (map.hasLayer(geojsonApplications)) {
+                activeLayer = "Applications";
+            } else if (map.hasLayer(geojsonAdmit)) {
+                activeLayer = "Admit";
+            } else if (map.hasLayer(geojsonEnroll)) {
+                activeLayer = "Enroll";
+            } else if (map.hasLayer(geojsonSchools)) {
+                activeLayer = "Schools";
+            }
+
+            var highlightStyle = {};
+
+            if (activeLayer === "Applications") {
+                highlightStyle = { weight: 3, color: '#666', fillOpacity: 0.7 };
+            } else if (activeLayer === "Admit" || activeLayer === "Enroll") {
+                highlightStyle = { weight: 5, color: '#666', fillOpacity: 0.7 };
+            } else if (activeLayer === "Enroll" || activeLayer === "Schools") {
+                highlightStyle = { weight: 7, color: '#666', fillOpacity: 0.7 };
+            }
+
+            layer.setStyle(highlightStyle);
+
+            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                layer.bringToFront();
+            }
+            info.update(layer.feature.properties, activeLayer);
+        }
+
+
+        // Hold the information of the last province hovered over
+        function resetHighlight(e) {
+            var layer = e.target;
+
+            if (map.hasLayer(geojsonApplications)) {
+                geojsonApplications.resetStyle(layer);
+            } else if (map.hasLayer(geojsonAdmit)) {
+                geojsonAdmit.resetStyle(layer);
+            } else if (map.hasLayer(geojsonEnroll)) {
+                geojsonEnroll.resetStyle(layer);
+            } else if (map.hasLayer(geojsonSchools)){
+                geojsonSchools.resetStyle(layer);
+            }
+        }
+
+        // Define and add the linsteners when click
+        function zoomToFeature(e) {
+            map.fitBounds(e.target.getBounds());
+        }
+
+        // Event listeners for each feature on the map
+        function onEachFeature(feature, layer) {
+            layer.on({
+                mouseover: highlightFeature,
+                mouseout: resetHighlight,
+                click: zoomToFeature
+            });
+        }
+        
+        // Declare the geojson variable
+        var geojsonApplications, geojsonAdmit, geojsonEnroll, geojsonSchools;
+
+        // Fetching the geojson data and creating geojson layers
+        fetch('provinceGeometry.json')
+            .then(response => response.json())
+            .then(data => {
+                geojsonApplications = L.geoJson(data, { style: styleApplications, onEachFeature: onEachFeature });
+                geojsonAdmit = L.geoJson(data, { style: styleAdmit, onEachFeature: onEachFeature });
+                geojsonEnroll = L.geoJson(data, { style: styleEnroll, onEachFeature: onEachFeature });
+                geojsonSchools = L.geoJson(data, { style: styleSchools, onEachFeature: onEachFeature});
+
+                geojsonApplications.addTo(map);
+
+                // Define the markers for Layer groups last_inst_attend
+                var SCCS = L.marker([22.533713613949452, 113.93621458829912]).bindPopup('<strong>Ranked 1st:<br/></strong> Shenzhen Concord Coll of Sino<br/>  1069 applications'),
+                    DMLIS    = L.marker([39.09134597117727, 122.01900199084575]).bindPopup('<strong>Ranked 2nd:<br/></strong>  Dalian Maple Leaf Int School<br/>  903 applications'),
+                    TTMLI    = L.marker([39.068889323781555, 117.72073996422817]).bindPopup('<strong>Ranked 3rd:<br/></strong>  Tianjin TEDA Maple Leaf Intern<br/>  882 applications'),
+                    SCHSS    = L.marker([31.056022,120.878094]).bindPopup('<strong>Ranked 4th:<br/></strong>  Sino Canada High Sch Suzhou<br/>  744 applications');
+                    WMLIS    = L.marker([30.47318745273707, 114.38520233463159]).bindPopup('<strong>Ranked 5th:<br/></strong>  Wuhan Maple Leaf Intl School<br/>  568 applications');
+                    TNHS    = L.marker([39.64911901272815, 118.1389751229832]).bindPopup('<strong>Ranked 6th:<br/></strong>  Tangshan No 1 High School<br/>  525 applications');
+                    HEHS    = L.marker([34.792004135440905, 113.6682959968084]).bindPopup('<strong>Ranked 7th:<br/></strong>  Henan Experimental High School<br/>  505 applications');
+                    TXMS    = L.marker([39.1107504960275, 117.21202589231078]).bindPopup('<strong>Ranked 8th:<br/></strong>  Tianjin Xinhua Middle School<br/>  392 applications');
+                    NFLS    = L.marker([32.05895159059436, 118.8010000703324]).bindPopup('<strong>Ranked 9th:<br/></strong>  Nanjing Foreign Language School<br/>  375 applications');
+                    HNSS    = L.marker([31.86250779579195, 117.27096859838927]).bindPopup('<strong>Ranked 10th:<br/></strong>  Hefei No. 1 Secondary S<br/>  272 applications');
+
+                // Combine the markers into layer group
+                var locations = L.layerGroup([SCCS, DMLIS, TTMLI, SCHSS, WMLIS, TNHS, HEHS, TXMS, NFLS, HNSS]);
+
+
+                // Create a custom control for the dropdown
+                var customControl = L.control({ position: 'topright' });
+
+                customControl.onAdd = function (map) {
+                    var div = L.DomUtil.create('div', 'layer-control');
+                    div.innerHTML = '<select id="layer-select">' +
+                                    '<option value="Applications">Applications</option>' +
+                                    '<option value="Admit">Admit</option>' +
+                                    '<option value="Enroll">Enroll</option>' +
+                                    '<option value="Schools">Schools</option></select>';
+                    L.DomEvent.on(div.firstChild, 'change', function (e) {
+                        // Hide all layers
+                        for (var layer in overlayMaps) {
+                            map.removeLayer(overlayMaps[layer]);
+                        }
+                        // Add the selected layer
+                        map.addLayer(overlayMaps[e.target.value]);
+                    });
+                    return div;
+                };
+                customControl.addTo(map);
+
+                var overlayMaps = {
+                    // "Applications": geojsonApplications,
+                    // "Admit": geojsonAdmit,
+                    // "Enroll": geojsonEnroll,
+                    // "Schools": geojsonSchools,
+                    "Top10 School Locations": locations
+                };
+
+                var layerControl = L.control.layers(null, overlayMaps, { position: 'topright' }).addTo(map);
+                
+
+                document.getElementById('layer-select').onchange = function (e) {
+                    map.removeLayer(geojsonApplications);
+                    map.removeLayer(geojsonAdmit);
+                    map.removeLayer(geojsonEnroll);
+                    map.removeLayer(geojsonSchools);
+
+                    switch (e.target.value) {
+                        case 'Applications':
+                            geojsonApplications.addTo(map);
+                            break;
+                        case 'Admit':
+                            geojsonAdmit.addTo(map);
+                            break;
+                        case 'Enroll':
+                            geojsonEnroll.addTo(map);
+                            break;
+                        case 'Schools':
+                            geojsonSchools.addTo(map);
+                            break;
+                    }
+                    // Object.keys(overlayMaps).forEach(function(key) {
+                    //     if (overlayMaps[key] !== overlayMaps[e.target.value] && key !== 'Locations') {
+                    //         map.removeLayer(overlayMaps[key]);
+                    //     }
+                    // });
+
+                    updateLegend(e.target.value);
+                };
+
+                var legend = L.control({position: 'bottomright'});
+                legend.onAdd = function (map) {
+                    var div = L.DomUtil.create('div', 'info legend');
+                    div.id = 'legend';
+                    return div;
+                };
+                legend.addTo(map);
+
+                // Function to update the legend based on active layer
+                function updateLegend(activeLayer) {
+                    var div = L.DomUtil.get('legend');
+                    div.innerHTML = '';
+
+                    var grades, colorFunction;
+                    if (activeLayer === 'Schools') {
+                        grades = [0, 5, 20, 40, 60, 80, 100, 200];
+                        colorFunction = getColorSchool;
+                    } else {
+                        grades = [0, 10, 50, 100, 200, 500, 1000, 2000];
+                        colorFunction = getColor;
+                    }
+
+                    for (var i = 0; i < grades.length - 1; i++) {
+                        div.innerHTML +=
+                            '<i style="background:' + colorFunction(grades[i]) + '"></i> ' +
+                            grades[i] + "&ndash;" + (grades[i + 1] - 1) + '<br>';
+                    }
+                    div.innerHTML += '<i style="background:' + colorFunction(grades[grades.length - 1]) + '"></i> ' + grades[grades.length - 1] + '+';
+                }
+                // Set default active layer for the legend
+                updateLegend('Applications');
+            })
+        .catch(error => console.error('Error fetching GeoJSON data:', error));
+
+    
+    </script>
+</body>
+</html>
